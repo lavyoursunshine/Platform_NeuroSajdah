@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroSajdah — Sinkronisasi Ibadah & Ritme Kognitif</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<style>
+  :root {
+    --bg-1: #FFF6F0;
+    --bg-2: #F0F7FF;
+    --bg-3: #F8F0FF;
+    --coral: #FF8B7B;
+    --coral-soft: #FFB8AD;
+    --mint: #7BC8A6;
+    --sky: #8AB4F8;
+    --lavender: #C4A0E8;
+    --amber: #FCD34D;
+    --ink: #2D2A4A;
+    --ink-soft: #6B6890;
+    --glass-bg: rgba(255, 255, 255, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.7);
+    --glass-shadow: 0 8px 32px rgba(45, 42, 74, 0.08);
+  }
+  * { -webkit-font-smoothing: antialiased; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 50%, var(--bg-3) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .arabic { font-family: 'Amiri', serif; direction: rtl; }
+
+  /* Floating orbs */
+  .orb { position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.5; pointer-events: none; z-index: 0; }
+  .orb-1 { width: 500px; height: 500px; background: #FFB7A8; top: -100px; left: -100px; animation: float1 25s infinite ease-in-out; }
+  .orb-2 { width: 600px; height: 600px; background: #B7D9F9; top: 30%; right: -200px; animation: float2 30s infinite ease-in-out; }
+  .orb-3 { width: 450px; height: 450px; background: #D4B7F9; bottom: -100px; left: 30%; animation: float3 28s infinite ease-in-out; }
+  .orb-4 { width: 350px; height: 350px; background: #B7E9D4; top: 60%; left: 10%; animation: float4 22s infinite ease-in-out; }
+  @keyframes float1 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(100px,80px) scale(1.1);} }
+  @keyframes float2 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(-120px,-60px) scale(0.9);} }
+  @keyframes float3 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(80px,-100px) scale(1.15);} }
+  @keyframes float4 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(-80px,120px) scale(0.85);} }
+
+  /* Glass */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 12px 40px rgba(45, 42, 74, 0.1);
+  }
+
+  .heading-display { font-weight: 800; letter-spacing: -0.04em; line-height: 1.05; }
+  .text-gradient {
+    background: linear-gradient(135deg, #FF8B7B 0%, #C4A0E8 50%, #8AB4F8 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: linear-gradient(135deg, #FF8B7B 0%, #FFA88B 100%);
+    color: white; font-weight: 600; padding: 0.875rem 1.75rem;
+    border-radius: 1rem; box-shadow: 0 8px 24px rgba(255, 139, 123, 0.35);
+    transition: all 0.3s ease; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(255, 139, 123, 0.45); }
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.6); color: var(--ink); font-weight: 600;
+    padding: 0.875rem 1.75rem; border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.8); transition: all 0.3s ease; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+  }
+  .btn-ghost:hover { background: rgba(255, 255, 255, 0.85); transform: translateY(-2px); }
+  .btn-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.8); cursor: pointer; transition: all 0.25s;
+  }
+  .btn-icon:hover { background: rgba(255,255,255,0.9); transform: scale(1.05); }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed rgba(255, 139, 123, 0.4);
+    transition: all 0.3s ease; cursor: pointer;
+    background: rgba(255, 139, 123, 0.03);
+  }
+  .upload-zone:hover, .upload-zone.dragging {
+    border-color: var(--coral);
+    background: rgba(255, 139, 123, 0.08);
+  }
+
+  /* Progress ring */
+  .progress-ring { transform: rotate(-90deg); }
+  .progress-ring circle { transition: stroke-dashoffset 0.6s ease; }
+
+  /* Animations */
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-fade-up { animation: fadeInUp 0.6s ease-out forwards; }
+  @keyframes pulse-soft { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.6; transform: scale(0.95);} }
+  .pulse-soft { animation: pulse-soft 2s infinite; }
+  @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.3); }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 139, 123, 0.4); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 139, 123, 0.6); }
+
+  /* Range slider */
+  input[type="range"] {
+    -webkit-appearance: none; 
+    appearance: none;
+    width: 100%; height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, #7BC8A6, #FCD34D, #FF8B7B); outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; 
+    appearance: none;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: white; border: 3px solid #FF8B7B; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255, 139, 123, 0.4);
+  }
+
+  /* Recommendation card */
+  .rec-card {
+    border-left: 4px solid; padding: 0.875rem 1rem; border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.5); transition: all 0.3s;
+  }
+  .rec-card:hover { background: rgba(255, 255, 255, 0.75); transform: translateX(4px); }
+  .rec-success { border-color: #7BC8A6; }
+  .rec-warning { border-color: #FCD34D; }
+  .rec-info    { border-color: #8AB4F8; }
+  .rec-error   { border-color: #FF8B7B; }
+
+  /* Number ticker */
+  .ticker {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Section divider */
+  .section-divider {
+    width: 60px; height: 4px; border-radius: 2px;
+    background: linear-gradient(90deg, #FF8B7B, #C4A0E8);
+    margin: 0 auto 1.5rem;
+  }
+
+  /* Tabs */
+  .tab-btn {
+    padding: 0.5rem 1rem; border-radius: 0.75rem; font-weight: 500;
+    transition: all 0.25s; cursor: pointer; font-size: 0.875rem;
+  }
+  .tab-btn.active {
+    background: white; color: var(--coral); box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(45, 42, 74, 0.4);
+    backdrop-filter: blur(8px); z-index: 100; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+  .modal-content {
+    transform: scale(0.9); transition: transform 0.3s;
+    max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto;
+  }
+  .modal-backdrop.show .modal-content { transform: scale(1); }
+
+  /* Hadith card */
+  .knowledge-card {
+    transition: all 0.3s ease;
+  }
+  .knowledge-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 48px rgba(45, 42, 74, 0.12);
+  }
+
+  /* Hide scrollbar for chips */
+  .scroll-x { scrollbar-width: none; }
+  .scroll-x::-webkit-scrollbar { display: none; }
+
+  /* Stress pulse */
+  .stress-indicator {
+    position: relative;
+  }
+  .stress-indicator::before {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    background: inherit; opacity: 0.4; animation: pulse-ring 2s infinite;
+  }
+</style>
+</head>
+<body>
+
+<!-- Floating orbs background -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+<div class="orb orb-4"></div>
+
+<!-- Navigation -->
+<nav class="glass fixed top-4 left-1/2 -translate-x-1/2 z-40 px-5 py-3 rounded-2xl flex items-center gap-6 max-w-[95%]">
+  <a href="#hero" class="flex items-center gap-2 shrink-0">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-400 via-amber-300 to-violet-400 flex items-center justify-center text-white font-bold shadow-lg shadow-rose-300/40">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z"/></svg>
+    </div>
+    <span class="font-bold text-lg hidden sm:block">NeuroSajdah</span>
+  </a>
+  <div class="hidden lg:flex items-center gap-1 text-sm">
+    <a href="#posture" class="px-3 py-1.5 rounded-lg hover:bg-white/60 transition">Posture Check</a>
+    <a href="#cognitive" class="px-3 py-1.5 rounded-lg hover:bg-white/60 transition">Cognitive Tracker</a>
+    <a href="#counter" class="px-3 py-1.5 rounded-lg hover:bg-white/60 transition">Target Harian</a>
+    <a href="#knowledge" class="px-3 py-1.5 rounded-lg hover:bg-white/60 transition">Rujukan</a>
+  </div>
+  <button onclick="scrollToSection('#posture')" class="btn-primary text-sm py-2 px-4">Mulai</button>
+</nav>
+
+<!-- Hero -->
+<section id="hero" class="relative pt-36 pb-16 px-6 z-10">
+  <div class="max-w-5xl mx-auto text-center">
+    <div class="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm mb-8 animate-fade-up">
+      <span class="w-2 h-2 bg-emerald-400 rounded-full pulse-soft"></span>
+      <span class="text-slate-600">Sinkronisasi ibadah dengan ritme biologis otak</span>
+    </div>
+    <h1 class="heading-display text-5xl md:text-7xl mb-6 animate-fade-up" style="animation-delay:0.05s">
+      Sujud yang <span class="text-gradient">lurus</span>,<br>
+      batin yang <span class="text-gradient">tenang</span>.
+    </h1>
+    <p class="arabic text-2xl text-slate-700 mb-2 animate-fade-up" style="animation-delay:0.1s">وَاسْتَعِينُوا بِالصَّبْرِ وَالصَّلَاةِ</p>
+    <p class="text-slate-500 text-sm mb-8 animate-fade-up" style="animation-delay:0.15s">
+      "Jadikanlah sabar dan salat sebagai penolongmu." — QS. Al-Baqarah: 45
+    </p>
+    <p class="text-lg text-slate-600 max-w-2xl mx-auto mb-10 animate-fade-up" style="animation-delay:0.2s">
+      NeuroSajdah memadukan analisis biomekanik medis dengan pandangan fikih Islam untuk menjaga kualitas sujud Anda — baik di salat wajib maupun saat istirahat kognitif di luar waktu salat, persis ketika saraf Anda paling membutuhkan ketenangan.
+    </p>
+    <div class="flex flex-wrap justify-center gap-4 animate-fade-up" style="animation-delay:0.25s">
+      <a href="#posture" class="btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Periksa Postur Sujud
+      </a>
+      <a href="#cognitive" class="btn-ghost">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Aktifkan Tracker Fokus
+      </a>
+    </div>
+
+    <!-- Feature chips -->
+    <div class="flex flex-wrap justify-center gap-2 mt-12 animate-fade-up" style="animation-delay:0.3s">
+      <div class="glass px-4 py-2 rounded-full text-xs font-medium text-slate-600">✓ Deteksi pose real-time MoveNet</div>
+      <div class="glass px-4 py-2 rounded-full text-xs font-medium text-slate-600">✓ Siklus Ultradian 90 menit</div>
+      <div class="glass px-4 py-2 rounded-full text-xs font-medium text-slate-600">✓ Rujukan fikih & medis</div>
+      <div class="glass px-4 py-2 rounded-full text-xs font-medium text-slate-600">✓ Diproses di perangkat Anda</div>
+    </div>
+  </div>
+</section>
+
+<!-- Posture Check -->
+<section id="posture" class="relative py-20 px-6 z-10">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-12">
+      <span class="text-rose-500 font-semibold text-xs uppercase tracking-widest">Fitur 01</span>
+      <div class="section-divider"></div>
+      <h2 class="heading-display text-4xl md:text-5xl mb-4">AI Posture Check</h2>
+      <p class="text-slate-600 max-w-2xl mx-auto">
+        Unggah foto simulasi sujud Anda di luar waktu salat. Sistem mendeteksi sudut punggung, kesejajaran tulang belakang, dan simetri tubuh lalu memberi koreksi berdasarkan standar biomekanik medis serta sunnah Nabi ﷺ.
+      </p>
+    </div>
+
+    <!-- Upload, Camera & Preview Area -->
+      <div class="glass rounded-3xl p-6 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-lg">Pemeriksaan Postur</h3>
+          <span class="text-xs text-slate-500 bg-white/50 px-3 py-1 rounded-full flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Diproses lokal
+          </span>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-4 p-1 bg-white/30 rounded-xl">
+          <button id="tabUpload" class="tab-btn active w-full text-center py-2">Unggah Foto</button>
+          <button id="tabCamera" class="tab-btn w-full text-center py-2 text-slate-500 hover:text-coral">Kamera Live</button>
+        </div>
+
+        <!-- Zona Upload (Tab 1) -->
+        <div id="uploadZone" class="upload-zone rounded-2xl p-8 text-center flex-1 flex flex-col items-center justify-center min-h-[300px]">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-300 to-amber-300 flex items-center justify-center mb-4 shadow-lg shadow-rose-200">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          </div>
+          <p class="font-semibold mb-1">Klik atau seret foto ke sini</p>
+          <p class="text-sm text-slate-500 mb-4">Pastikan foto menyamping</p>
+          <input type="file" id="fileInput" accept="image/*" class="hidden">
+        </div>
+
+        <!-- Zona Kamera (Tab 2) -->
+        <div id="cameraZone" class="hidden relative rounded-2xl overflow-hidden bg-slate-900 flex-1 min-h-[350px]">
+          <video id="webcamVideo" class="w-full h-full object-cover" autoplay playsinline></video>
+          
+          <!-- Overlay Pedoman Garis Bantu -->
+          <div class="absolute inset-6 border-2 border-dashed border-emerald-400/60 rounded-xl pointer-events-none flex flex-col items-center justify-center">
+            <div class="w-full h-full border border-emerald-400/20 rounded-lg relative">
+               <p class="absolute bottom-4 left-0 right-0 text-emerald-300 text-xs text-center px-4 font-medium drop-shadow-md">
+                 Posisikan seluruh tubuh menyamping<br>di dalam bingkai ini
+               </p>
+            </div>
+          </div>
+
+          <!-- Tombol Jepret -->
+          <button id="captureBtn" class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white text-rose-500 font-bold px-6 py-2.5 rounded-full shadow-lg shadow-black/20 hover:scale-105 transition flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="4"/><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>
+            Jepret
+          </button>
+        </div>
+
+        <!-- Zona Preview Hasil -->
+        <div id="previewContainer" class="hidden mt-2">
+          <div class="relative rounded-2xl overflow-hidden bg-white/40 shadow-inner">
+            <canvas id="resultCanvas" class="w-full h-auto block"></canvas>
+          </div>
+          <button id="resetViewBtn" class="btn-ghost w-full mt-4 text-sm justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            Kembali
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Analysis & Recommendations -->
+      <div class="glass rounded-3xl p-6">
+        <h3 class="font-bold text-lg mb-4">Hasil Analisis Biomekanik</h3>
+
+        <div id="loadingState" class="hidden text-center py-16">
+          <div class="inline-block w-12 h-12 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin mb-4"></div>
+          <p class="text-slate-500 text-sm">Memuat model AI & menganalisis postur...</p>
+          <p class="text-xs text-slate-400 mt-1" id="loadingDetail">Inisialisasi TensorFlow.js</p>
+        </div>
+
+        <div id="emptyState" class="text-center py-16">
+          <div class="text-6xl mb-4">🤲</div>
+          <p class="text-slate-500 text-sm">Hasil analisis postur akan muncul di sini setelah Anda mengunggah foto sujud.</p>
+        </div>
+
+        <div id="resultsState" class="hidden">
+          <!-- Score -->
+          <div class="bg-gradient-to-br from-white/60 to-white/30 rounded-2xl p-5 mb-4 flex items-center justify-between border border-white/60">
+            <div>
+              <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Skor Postur</p>
+              <p class="text-4xl font-bold ticker" id="scoreValue">--</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</p>
+              <p class="font-semibold text-lg" id="scoreStatus">--</p>
+              <p class="text-xs text-slate-400 mt-1" id="scoreDesc"></p>
+            </div>
+          </div>
+
+          <!-- Angle measurements -->
+          <div class="space-y-3 mb-5">
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-slate-600 font-medium">Sudut Punggung ke Horizontal</span>
+                <span class="font-bold ticker" id="backAngleValue">--</span>
+              </div>
+              <div class="h-2 bg-white/40 rounded-full overflow-hidden">
+                <div id="backAngleBar" class="h-full rounded-full transition-all duration-700" style="width:0%"></div>
+              </div>
+              <p class="text-xs text-slate-500 mt-1" id="backAngleNote">Rentang ideal: 15–35°</p>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-slate-600 font-medium">Kesejajaran Kepala-Bahu-Pinggul</span>
+                <span class="font-bold ticker" id="alignmentValue">--</span>
+              </div>
+              <div class="h-2 bg-white/40 rounded-full overflow-hidden">
+                <div id="alignmentBar" class="h-full rounded-full transition-all duration-700" style="width:0%"></div>
+              </div>
+              <p class="text-xs text-slate-500 mt-1" id="alignmentNote">Kepala idealnya lebih rendah dari garis bahu</p>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-slate-600 font-medium">Simetri Tubuh (Kiri–Kanan)</span>
+                <span class="font-bold ticker" id="symmetryValue">--</span>
+              </div>
+              <div class="h-2 bg-white/40 rounded-full overflow-hidden">
+                <div id="symmetryBar" class="h-full rounded-full transition-all duration-700" style="width:0%"></div>
+              </div>
+              <p class="text-xs text-slate-500 mt-1" id="symmetryNote">Selisih tinggi bahu & pinggul idealnya < 30px</p>
+            </div>
+          </div>
+
+          <!-- Recommendations -->
+          <div>
+            <h4 class="font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Rekomendasi Koreksi
+            </h4>
+            <div id="recommendationsList" class="space-y-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Cognitive Tracker -->
+<section id="cognitive" class="relative py-20 px-6 z-10">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-12">
+      <span class="text-violet-500 font-semibold text-xs uppercase tracking-widest">Fitur 02</span>
+      <div class="section-divider"></div>
+      <h2 class="heading-display text-4xl md:text-5xl mb-4">Cognitive Sujud Tracker</h2>
+      <p class="text-slate-600 max-w-2xl mx-auto">
+        Bukan alarm biasa. Sistem menyinkronkan waktu kerja Anda dengan Ultradian Rhythm — batas maksimal fokus otak manusia — dan merekomendasikan Sujud Break via salat sunnah di saat batin paling butuh ketenangan.
+      </p>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+      <!-- Focus Timer -->
+      <div class="glass rounded-3xl p-6 lg:col-span-1">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-lg">Sesi Fokus</h3>
+          <div class="flex items-center gap-1 text-xs text-slate-500">
+            <span class="w-2 h-2 bg-emerald-400 rounded-full" id="sessionDot"></span>
+            <span id="sessionStatus">Belum dimulai</span>
+          </div>
+        </div>
+
+        <div class="relative flex items-center justify-center my-6">
+          <svg class="progress-ring" width="220" height="220">
+            <circle cx="110" cy="110" r="90" stroke="rgba(255,255,255,0.5)" stroke-width="12" fill="none"/>
+            <circle id="progressRing" cx="110" cy="110" r="90" stroke="url(#ringGradient)" stroke-width="12" fill="none"
+              stroke-dasharray="565.48" stroke-dashoffset="565.48" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FF8B7B"/>
+                <stop offset="50%" stop-color="#FCD34D"/>
+                <stop offset="100%" stop-color="#C4A0E8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="absolute text-center">
+            <p class="text-4xl font-bold ticker" id="timerDisplay">00:00</p>
+            <p class="text-xs text-slate-500 mt-1">dari 90 menit</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+          <div class="bg-white/40 rounded-xl p-2">
+            <p class="text-xs text-slate-500">Siklus</p>
+            <p class="font-bold ticker" id="cycleCount">0</p>
+          </div>
+          <div class="bg-white/40 rounded-xl p-2">
+            <p class="text-xs text-slate-500">Sujud Break</p>
+            <p class="font-bold ticker" id="breakCount">0</p>
+          </div>
+          <div class="bg-white/40 rounded-xl p-2">
+            <p class="text-xs text-slate-500">Fokus Total</p>
+            <p class="font-bold ticker" id="totalFocus">0m</p>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button id="startBtn" class="btn-primary flex-1 text-sm justify-center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Mulai
+          </button>
+          <button id="pauseBtn" class="btn-ghost flex-1 text-sm justify-center" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            Jeda
+          </button>
+          <button id="resetBtn" class="btn-icon" title="Reset">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stress Check -->
+      <div class="glass rounded-3xl p-6 lg:col-span-1">
+        <h3 class="font-bold text-lg mb-1">Cek Beban Kognitif</h3>
+        <p class="text-sm text-slate-500 mb-5">Saraf vagus butuh reset? Geser sesuai kondisi Anda saat ini.</p>
+
+        <div class="text-center mb-5">
+          <div class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-3" id="stressVisual">
+            <span class="text-3xl" id="stressEmoji">😌</span>
+          </div>
+          <p class="font-bold text-lg" id="stressLabel">Tenang</p>
+          <p class="text-xs text-slate-500" id="stressDesc">Kondisi optimal untuk fokus mendalam</p>
+        </div>
+
+        <div class="mb-2">
+          <input type="range" min="1" max="5" value="2" id="stressSlider">
+          <div class="flex justify-between text-xs text-slate-400 mt-2">
+            <span>Tenang</span>
+            <span>Terbebani</span>
+            <span>Overload</span>
+          </div>
+        </div>
+
+        <div class="mt-5 p-4 bg-gradient-to-br from-violet-100/60 to-rose-100/40 rounded-xl border border-white/60">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-violet-400/80 flex items-center justify-center shrink-0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div class="flex-1">
+              <p class="text-xs text-slate-500 mb-0.5">Ultradian Rhythm</p>
+              <p class="text-sm font-medium" id="ultradianStatus">Siklus 1 — Fase Focus Aktif</p>
+              <p class="text-xs text-slate-500 mt-1" id="ultradianDetail">Otak Anda berada di puncak fokus. Tetap pada satu tugas.</p>
+            </div>
+          </div>
+        </div>
+
+        <button id="manualBreakBtn" class="btn-ghost w-full mt-4 text-sm justify-center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Saya Butuh Sujud Break Sekarang
+        </button>
+      </div>
+
+      <!-- Recommendation Card -->
+      <div class="glass-strong rounded-3xl p-6 lg:col-span-1 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-amber-300/30 to-rose-300/20 rounded-full blur-3xl"></div>
+        <div class="relative">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-lg">Rekomendasi Saat Ini</h3>
+            <span class="text-xs px-2 py-1 rounded-full bg-emerald-100/70 text-emerald-700 font-medium" id="currentTimeLabel">--</span>
+          </div>
+
+          <div id="recommendationContent">
+            <div class="rounded-2xl p-4 bg-gradient-to-br from-rose-400/90 to-violet-400/90 text-white mb-4">
+              <p class="text-xs uppercase tracking-wider opacity-80 mb-1">Sunnah yang Cocok</p>
+              <p class="text-2xl font-bold mb-1" id="recPrayerName">Salat Dhuha</p>
+              <p class="text-sm opacity-90" id="recPrayerTime">Pukul 06.45 – 11.30</p>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Keterangan Medis</p>
+                <p class="text-sm text-slate-700" id="recMedical">Cahaya pagi mengaktifkan kortisol rendah dan menurunkan melatonin. Sujud meningkatkan aliran darah ke korteks prefrontal untuk fungsi eksekutif sepanjang hari.</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Dalil & Fikih</p>
+                <p class="text-sm text-slate-700" id="recFiqh">"Setiap pagi, setiap ruas tubuh salah seorang dari kalian wajib bersedekah... Cukup dengan salat Dhuha dua rakaat." (HR. Muslim)</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-4">
+              <div class="bg-white/50 rounded-xl p-3 text-center">
+                <p class="text-xs text-slate-500">Jumlah Sujud</p>
+                <p class="text-xl font-bold ticker" id="recSujudCount">4</p>
+              </div>
+              <div class="bg-white/50 rounded-xl p-3 text-center">
+                <p class="text-xs text-slate-500">Estimasi Reset</p>
+                <p class="text-xl font-bold" id="recResetTime">5 menit</p>
+              </div>
+            </div>
+
+            <button id="markDoneBtn" class="btn-primary w-full mt-4 text-sm justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Saya Sudah Melaksanakan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Sujud Counter -->
+<section id="counter" class="relative py-20 px-6 z-10">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-12">
+      <span class="text-emerald-500 font-semibold text-xs uppercase tracking-widest">Fitur 03</span>
+      <div class="section-divider"></div>
+      <h2 class="heading-display text-4xl md:text-5xl mb-4">Target Sujud Harian</h2>
+      <p class="text-slate-600 max-w-2xl mx-auto">
+        Rasulullah ﷺ bersabda: "Perbanyaklah sujud kepada Allah." (HR. Muslim). Setiap sujud adalah reset saraf vagus dan pengingat ketundukan hati.
+      </p>
+    </div>
+
+    <div class="glass rounded-3xl p-8">
+      <div class="grid md:grid-cols-2 gap-8 items-center">
+        <div class="text-center">
+          <p class="text-sm text-slate-500 uppercase tracking-wider mb-2">Sujud Hari Ini</p>
+          <div class="flex items-baseline justify-center gap-2 mb-4">
+            <span class="text-7xl font-bold ticker text-gradient" id="sujudToday">0</span>
+            <span class="text-2xl text-slate-400 font-medium">/ <span id="sujudGoal">100</span></span>
+          </div>
+          <div class="flex justify-center gap-2 mb-4">
+            <button class="btn-icon" onclick="adjustSujud(-1)" title="Kurangi">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button class="btn-primary" onclick="adjustSujud(2)" title="Tambah 2 (1 rakaat)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              + 1 Rakaat
+            </button>
+            <button class="btn-icon" onclick="adjustSujud(10)" title="Tambah 10">
+              <span class="text-xs font-bold">+10</span>
+            </button>
+          </div>
+          <p class="text-xs text-slate-400">Setiap salat 2 sujud per rakaat. Klik "+1 Rakaat" untuk menambah 2 sujud sekaligus.</p>
+        </div>
+
+        <div>
+          <div class="mb-4">
+            <div class="flex justify-between text-sm mb-1.5">
+              <span class="text-slate-600 font-medium">Progress Harian</span>
+              <span class="font-bold" id="sujudPercent">0%</span>
+            </div>
+            <div class="h-3 bg-white/40 rounded-full overflow-hidden">
+              <div id="sujudProgressBar" class="h-full bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400 transition-all duration-700" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white/50 rounded-xl p-3">
+              <p class="text-xs text-slate-500">Streak Harian</p>
+              <p class="text-xl font-bold ticker"><span id="streakDays">0</span> hari</p>
+            </div>
+            <div class="bg-white/50 rounded-xl p-3">
+              <p class="text-xs text-slate-500">Total Mingguan</p>
+              <p class="text-xl font-bold ticker" id="weeklyTotal">0</p>
+            </div>
+            <div class="bg-white/50 rounded-xl p-3 col-span-2">
+              <p class="text-xs text-slate-500 mb-1">Distribusi 7 Hari Terakhir</p>
+              <div class="flex items-end justify-between gap-1 h-12" id="weeklyChart">
+                <!-- bars filled by JS -->
+              </div>
+            </div>
+          </div>
+
+          <button onclick="resetSujud()" class="text-xs text-slate-400 hover:text-rose-500 transition mt-4 flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Reset harian (jika sudah berganti hari)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Knowledge Base -->
+<section id="knowledge" class="relative py-20 px-6 z-10">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-12">
+      <span class="text-sky-500 font-semibold text-xs uppercase tracking-widest">Dasar Ilmiah & Syar'i</span>
+      <div class="section-divider"></div>
+      <h2 class="heading-display text-4xl md:text-5xl mb-4">Mengapa Sujud Meredakan Stres</h2>
+      <p class="text-slate-600 max-w-2xl mx-auto">
+        NeuroSajdah bukan menggantikan ulama atau dokter, melainkan menjembatani kedua disiplin ini dalam praktik harian.
+      </p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5" id="knowledgeGrid">
+      <!-- Filled by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="relative z-10 py-12 px-6 mt-12">
+  <div class="max-w-7xl mx-auto">
+    <div class="glass rounded-3xl p-8 text-center">
+      <div class="flex items-center justify-center gap-2 mb-4">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-400 via-amber-300 to-violet-400 flex items-center justify-center text-white">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z"/></svg>
+        </div>
+        <span class="font-bold">NeuroSajdah</span>
+      </div>
+      <p class="text-sm text-slate-500 max-w-md mx-auto mb-4">
+        Dibuat untuk membantu muslim menjaga kualibadah sujud dengan kesadaran biomekanik dan ritme kognitif. Bukan pengganti fatwa ulama atau diagnosis medis.
+      </p>
+      <p class="arabic text-lg text-slate-600 mb-1">رَبَّنَا تَقَبَّلْ مِنَّا ۖ إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ</p>
+      <p class="text-xs text-slate-400">"Ya Rabb kami, terimalah amal dari kami. Sesungguhnya Engkaulah Yang Maha Mendengar lagi Maha Mengetahui." — QS. Al-Baqarah: 127</p>
+    </div>
+  </div>
+</footer>
+
+<!-- Recommendation Modal -->
+<div id="breakModal" class="modal-backdrop">
+  <div class="modal-content glass-strong rounded-3xl p-8">
+    <div class="text-center mb-5">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-400 to-violet-400 mb-4 shadow-lg shadow-rose-300/40">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z"/></svg>
+      </div>
+      <h3 class="text-2xl font-bold mb-1" id="modalTitle">Waktunya Sujud Break</h3>
+      <p class="text-sm text-slate-500" id="modalReason">Siklus ultradian Anda telah selesai</p>
+    </div>
+
+    <div class="bg-gradient-to-br from-rose-100/60 to-violet-100/40 rounded-2xl p-5 mb-5">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Rekomendasi</p>
+      <p class="text-xl font-bold mb-2" id="modalPrayer">Salat Dhuha (2 rakaat)</p>
+      <p class="text-sm text-slate-600 mb-3" id="modalMedical"></p>
+      <p class="text-sm text-slate-600" id="modalFiqh"></p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <button onclick="closeModal()" class="btn-ghost text-sm justify-center">Nanti Saja</button>
+      <button onclick="markBreakDone()" class="btn-primary text-sm justify-center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Sudah Dilaksanakan
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center"></div>
+
+<script>
+// ============================================================
+//  NeuroSajdah — Full Core Logic (Upload + Live Camera + Tracker)
+// ============================================================
+
+const CONFIG = {
+  ultradianCycleMinutes: 90,
+  dailySujudGoal: 100,
+};
+
+const state = {
+  detector: null,
+  modelLoaded: false,
+  modelLoading: false,
+  workSession: {
+    active: false,
+    interval: null,
+    secondsElapsed: 0,
+    cycleCount: 0,
+  },
+  sujud: {
+    today: 0,
+  }
+};
+
+let webcamStream = null;
+const videoElement = document.getElementById('webcamVideo');
+
+// ============================================================
+//  UTILITIES & TOASTS
+// ============================================================
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  const colors = {
+    info: 'from-sky-400 to-violet-400',
+    success: 'from-emerald-400 to-mint-400',
+    warning: 'from-amber-400 to-rose-400',
+    error: 'from-rose-500 to-rose-400'
+  };
+  toast.className = `glass-strong px-5 py-3 rounded-2xl text-sm flex items-center gap-2 animate-fade-up shadow-xl mb-2`;
+  toast.innerHTML = `<div class="w-3 h-3 rounded-full bg-gradient-to-r ${colors[type]||colors.info}"></div><span class="font-medium">${message}</span>`;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.transition = 'all 0.3s';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function scrollToSection(id) {
+  document.querySelector(id).scrollIntoView({ behavior: 'smooth' });
+}
+
+// ============================================================
+//  AI POSE DETECTION (MoveNet) & BIOMECHANICS
+// ============================================================
+async function initPoseDetector() {
+  if (state.modelLoaded || state.modelLoading) return;
+  state.modelLoading = true;
+  
+  const loadingState = document.getElementById('loadingState');
+  const emptyState = document.getElementById('emptyState');
+  
+  if (emptyState) emptyState.classList.add('hidden');
+  if (loadingState) loadingState.classList.remove('hidden');
+  
+  try {
+    await tf.ready();
+    state.detector = await poseDetection.createDetector(
+      poseDetection.SupportedModels.MoveNet,
+      { modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER }
+    );
+    state.modelLoaded = true;
+  } catch (err) {
+    showToast('Gagal memuat AI Medis. Pastikan internet stabil.', 'error');
+  } finally {
+    state.modelLoading = false;
+  }
+}
+
+function calculatePosture(keypoints) {
+  // Ambil titik dominan (kiri atau kanan yang paling terlihat/akurat)
+  const getPoint = (name) => keypoints.find(k => k.name === name && k.score > 0.3);
+  
+  const shoulder = getPoint('left_shoulder') || getPoint('right_shoulder');
+  const hip = getPoint('left_hip') || getPoint('right_hip');
+  const ear = getPoint('left_ear') || getPoint('right_ear');
+
+  if (!shoulder || !hip) return { error: 'Titik bahu atau pinggul tidak terlihat jelas di foto. Coba foto yang menampilkan seluruh badan menyamping.' };
+
+  // Hitung Sudut Punggung (menggunakan Math.atan2)
+  const deltaY = hip.y - shoulder.y;
+  const deltaX = hip.x - shoulder.x;
+  let backAngle = Math.abs(Math.atan2(deltaY, deltaX) * (180 / Math.PI));
+  
+  if (backAngle > 90) backAngle = 180 - backAngle; // Normalisasi
+
+  const hipHigher = hip.y < shoulder.y; // Y di canvas terbalik (0 di atas)
+  const headLower = ear ? ear.y > shoulder.y : null;
+
+  return { backAngle, hipHigher, headLower, error: null };
+}
+
+function drawResult(image, keypoints) {
+  const canvas = document.getElementById('resultCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  canvas.width = image.width || image.videoWidth;
+  canvas.height = image.height || image.videoHeight;
+  ctx.drawImage(image, 0, 0);
+
+  // Gambar titik-titik persendian
+  keypoints.forEach(point => {
+    if (point.score > 0.3) {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = '#FF8B7B';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  });
+}
+
+function displayAnalysisResults(analysis) {
+  document.getElementById('loadingState').classList.add('hidden');
+  const resultDiv = document.getElementById('resultsState');
+  resultDiv.classList.remove('hidden');
+
+  if (analysis.error) {
+    showToast(analysis.error, 'warning');
+    return;
+  }
+
+  // Update UI Nilai Sudut
+  document.getElementById('backAngleValue').innerText = `${Math.round(analysis.backAngle)}°`;
+  document.getElementById('backAngleBar').style.width = `${Math.min(analysis.backAngle * 2, 100)}%`;
+  document.getElementById('backAngleBar').className = 'h-full rounded-full transition-all duration-700 ' + (analysis.backAngle >= 10 && analysis.backAngle <= 45 ? 'bg-emerald-400' : 'bg-rose-400');
+
+  document.getElementById('alignmentValue').innerText = analysis.headLower ? 'Ideal' : 'Koreksi';
+  document.getElementById('alignmentBar').style.width = analysis.headLower ? '100%' : '30%';
+  document.getElementById('alignmentBar').className = 'h-full rounded-full transition-all duration-700 ' + (analysis.headLower ? 'bg-emerald-400' : 'bg-rose-400');
+
+  // Skor Postur 
+  let score = 50;
+  let recs = [];
+  
+  if (analysis.hipHigher) {
+    score += 25;
+  } else {
+    recs.push('<div class="rec-card rec-error text-sm mb-2">Angkat sedikit area pinggul Anda. Pinggul harus lebih tinggi dari bahu untuk peregangan otot punggung yang optimal.</div>');
+  }
+
+  if (analysis.backAngle >= 10 && analysis.backAngle <= 45) {
+    score += 25;
+  } else {
+    recs.push('<div class="rec-card rec-warning text-sm mb-2">Sudut punggung tidak ideal. Pastikan punggung lurus mendatar, tidak melengkung ke dalam atau terlalu membungkuk.</div>');
+  }
+
+  document.getElementById('scoreValue').innerText = score;
+  document.getElementById('scoreStatus').innerText = score === 100 ? 'Sempurna' : 'Perlu Koreksi';
+  
+  const recList = document.getElementById('recommendationsList');
+  if (score === 100) {
+    recList.innerHTML = '<div class="rec-card rec-success text-sm">Masya Allah. Postur biomekanik sujud Anda sangat baik. Tahan posisi ini selama beberapa detik untuk merilekskan saraf vagus secara maksimal.</div>';
+  } else {
+    recList.innerHTML = recs.join('');
+  }
+}
+
+// ============================================================
+//  LIVE CAMERA & TABS LOGIC
+// ============================================================
+async function startCamera() {
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode: "user" } 
+    });
+    videoElement.srcObject = webcamStream;
+  } catch (err) {
+    showToast('Izin kamera ditolak atau tidak tersedia.', 'error');
+  }
+}
+
+function stopCamera() {
+  if (webcamStream) {
+    webcamStream.getTracks().forEach(track => track.stop());
+    webcamStream = null;
+  }
+}
+
+// Logika Ganti Tab
+document.getElementById('tabUpload').addEventListener('click', () => {
+  stopCamera();
+  document.getElementById('tabUpload').classList.add('active', 'shadow-sm', 'bg-white', 'text-coral');
+  document.getElementById('tabUpload').classList.remove('text-slate-500');
+  
+  document.getElementById('tabCamera').classList.remove('active', 'shadow-sm', 'bg-white', 'text-coral');
+  document.getElementById('tabCamera').classList.add('text-slate-500');
+  
+  document.getElementById('cameraZone').classList.add('hidden');
+  document.getElementById('uploadZone').classList.remove('hidden');
+  document.getElementById('previewContainer').classList.add('hidden');
+});
+
+document.getElementById('tabCamera').addEventListener('click', () => {
+  document.getElementById('tabCamera').classList.add('active', 'shadow-sm', 'bg-white', 'text-coral');
+  document.getElementById('tabCamera').classList.remove('text-slate-500');
+  
+  document.getElementById('tabUpload').classList.remove('active', 'shadow-sm', 'bg-white', 'text-coral');
+  document.getElementById('tabUpload').classList.add('text-slate-500');
+  
+  document.getElementById('uploadZone').classList.add('hidden');
+  document.getElementById('previewContainer').classList.add('hidden');
+  document.getElementById('cameraZone').classList.remove('hidden');
+  
+  startCamera();
+});
+
+// Logika Upload Foto
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  img.onload = async () => {
+    document.getElementById('uploadZone').classList.add('hidden');
+    document.getElementById('previewContainer').classList.remove('hidden');
+    
+    await initPoseDetector();
+    if (!state.modelLoaded) return;
+
+    const poses = await state.detector.estimatePoses(img);
+    if (poses.length === 0) {
+      showToast('Tidak mendeteksi postur manusia.', 'error');
+      return;
+    }
+
+    drawResult(img, poses[0].keypoints);
+    const analysis = calculatePosture(poses[0].keypoints);
+    displayAnalysisResults(analysis);
+  };
+});
+
+document.getElementById('uploadZone').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+
+// Logika Jepret Kamera Live
+document.getElementById('captureBtn').addEventListener('click', async () => {
+  if (!videoElement.srcObject) return;
+
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = videoElement.videoWidth;
+  tempCanvas.height = videoElement.videoHeight;
+  tempCanvas.getContext('2d').drawImage(videoElement, 0, 0);
+  
+  stopCamera();
+  document.getElementById('cameraZone').classList.add('hidden');
+  document.getElementById('previewContainer').classList.remove('hidden');
+  
+  const img = new Image();
+  img.src = tempCanvas.toDataURL('image/png');
+  img.onload = async () => {
+    await initPoseDetector();
+    if (!state.modelLoaded) return;
+    
+    document.getElementById('resultsState').classList.add('hidden');
+    
+    const poses = await state.detector.estimatePoses(img);
+    if (poses.length === 0) {
+      showToast('Postur tidak terdeteksi. Coba ulangi dengan pencahayaan terang.', 'error');
+      return;
+    }
+
+    drawResult(img, poses[0].keypoints);
+    const analysis = calculatePosture(poses[0].keypoints);
+    displayAnalysisResults(analysis);
+  };
+});
+
+// Tombol Kembali (Bawah Canvas Preview)
+document.getElementById('resetViewBtn').addEventListener('click', () => {
+  document.getElementById('previewContainer').classList.add('hidden');
+  document.getElementById('resultsState').classList.add('hidden');
+  document.getElementById('emptyState').classList.remove('hidden');
+  
+  if (document.getElementById('tabCamera').classList.contains('active')) {
+    document.getElementById('cameraZone').classList.remove('hidden');
+    startCamera();
+  } else {
+    document.getElementById('uploadZone').classList.remove('hidden');
+    document.getElementById('fileInput').value = '';
+  }
+});
+
+
+// ============================================================
+//  COGNITIVE TRACKER & TIMER
+// ============================================================
+function updateTimerUI() {
+  const mins = Math.floor(state.workSession.secondsElapsed / 60);
+  const secs = state.workSession.secondsElapsed % 60;
+  document.getElementById('timerDisplay').innerText = 
+    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  
+  const totalSeconds = CONFIG.ultradianCycleMinutes * 60;
+  const progress = Math.min(state.workSession.secondsElapsed / totalSeconds, 1);
+  const offset = 565.48 - (progress * 565.48);
+  document.getElementById('progressRing').style.strokeDashoffset = offset;
+
+  if (state.workSession.secondsElapsed >= totalSeconds) {
+    triggerSujudBreak("Waktu Ultradian 90 menit telah tercapai.");
+  }
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (state.workSession.active) return;
+  state.workSession.active = true;
+  document.getElementById('sessionStatus').innerText = 'Fokus Aktif';
+  document.getElementById('sessionDot').classList.add('animate-pulse');
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('pauseBtn').disabled = false;
+  
+  state.workSession.interval = setInterval(() => {
+    state.workSession.secondsElapsed++;
+    updateTimerUI();
+  }, 1000);
+});
+
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  state.workSession.active = false;
+  clearInterval(state.workSession.interval);
+  document.getElementById('sessionStatus').innerText = 'Jeda';
+  document.getElementById('sessionDot').classList.remove('animate-pulse');
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('pauseBtn').disabled = true;
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  state.workSession.active = false;
+  clearInterval(state.workSession.interval);
+  state.workSession.secondsElapsed = 0;
+  updateTimerUI();
+  document.getElementById('sessionStatus').innerText = 'Belum dimulai';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('pauseBtn').disabled = true;
+});
+
+// Stress Slider Logic
+document.getElementById('stressSlider').addEventListener('input', (e) => {
+  const val = parseInt(e.target.value);
+  const emojis = ['😌', '🙂', '😐', '😫', '🤯'];
+  const labels = ['Sangat Tenang', 'Fokus', 'Mulai Lelah', 'Terbebani', 'Cognitive Overload'];
+  
+  document.getElementById('stressEmoji').innerText = emojis[val-1];
+  document.getElementById('stressLabel').innerText = labels[val-1];
+
+  if (val >= 4 && state.workSession.active) {
+    triggerSujudBreak("Mendeteksi tingkat stres tinggi sebelum siklus berakhir.");
+  }
+});
+
+document.getElementById('manualBreakBtn').addEventListener('click', () => {
+  triggerSujudBreak("Anda meminta jeda manual.");
+});
+
+
+// ============================================================
+//  FIQH & MEDICAL RECOMMENDATIONS
+// ============================================================
+function triggerSujudBreak(reason) {
+  if (state.workSession.active) document.getElementById('pauseBtn').click();
+  
+  const hour = new Date().getHours();
+  let prayer = "", medical = "", fiqh = "";
+
+  if (hour >= 6 && hour < 11) {
+    prayer = "Salat Dhuha (2 - 8 Rakaat)";
+    medical = "Gerakan sujud di pagi hari meningkatkan aliran darah kaya oksigen ke otak, membersihkan kabut kognitif (brain fog), dan menstabilkan hormon kortisol.";
+    fiqh = "Rasulullah ﷺ bersabda: 'Setiap ruas tulang manusia wajib disedekahi setiap hari... dan itu semua bisa dicukupi dengan dua rakaat salat Dhuha.' (HR. Muslim)";
+  } else if (hour >= 12 && hour < 15) {
+    prayer = "Qailulah & Rawatib Dzuhur";
+    medical = "Waktu siang adalah saat energi sirkadian menurun. Tidur sejenak (power nap) lalu dilanjutkan gerakan salat membantu me-reset kelelahan mata dan saraf vagus punggung.";
+    fiqh = "Rasulullah ﷺ bersabda: 'Tidurlah qailulah (siang hari), karena sesungguhnya setan tidak tidur siang.' (HR. Ath-Thabrani)";
+  } else if (hour >= 15 && hour < 18) {
+    prayer = "Sujud Syukur / Rawatib Asar";
+    medical = "Di sore hari, tulang punggung menanggung beban kompresi paling tinggi. Sujud membantu mendekompresi ruas tulang belakang setelah duduk seharian.";
+    fiqh = "Menjaga salat di waktu Asar sangat ditekankan. 'Barangsiapa meninggalkan salat Asar, maka batal amalannya.' (HR. Bukhari)";
+  } else {
+    prayer = "Salat Sunnah Mutlaq / Tahajjud";
+    medical = "Sujud panjang di malam hari secara klinis memicu gelombang otak Theta dan Delta, membawa relaksasi mendalam dan pemulihan kognitif (neuroplastisitas).";
+    fiqh = "Sebaik-baik salat setelah salat fardhu adalah salat malam (Tahajjud). (HR. Muslim)";
+  }
+
+  document.getElementById('modalReason').innerText = reason;
+  document.getElementById('modalPrayer').innerText = prayer;
+  document.getElementById('modalMedical').innerText = medical;
+  document.getElementById('modalFiqh').innerText = fiqh;
+  
+  document.getElementById('breakModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('breakModal').classList.remove('show');
+}
+
+function markBreakDone() {
+  closeModal();
+  adjustSujud(4); // Tambah 4 sujud (setara 2 rakaat)
+  showToast('Alhamdulillah, saraf dan batin Anda telah direfresh.', 'success');
+  
+  state.workSession.cycleCount++;
+  document.getElementById('cycleCount').innerText = state.workSession.cycleCount;
+  document.getElementById('resetBtn').click();
+}
+
+// ============================================================
+//  SUJUD COUNTER
+// ============================================================
+function adjustSujud(amount) {
+  state.sujud.today += amount;
+  if (state.sujud.today < 0) state.sujud.today = 0;
+  
+  document.getElementById('sujudToday').innerText = state.sujud.today;
+  
+  const percent = Math.min((state.sujud.today / CONFIG.dailySujudGoal) * 100, 100);
+  document.getElementById('sujudPercent').innerText = `${Math.round(percent)}%`;
+  document.getElementById('sujudProgressBar').style.width = `${percent}%`;
+
+  if (percent >= 100 && state.sujud.today - amount < CONFIG.dailySujudGoal) {
+    showToast('Masya Allah! Target harian sujud Anda tercapai.', 'success');
+  }
+}
+
+function resetSujud() {
+  state.sujud.today = 0;
+  adjustSujud(0);
+  showToast('Penghitung sujud harian di-reset.', 'info');
+}
+
+// Initialize Sujud Counter on load
+adjustSujud(0);
+<script/>
